@@ -1,1 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Access CLI</title>
+    <style>
+        /* CSS Variables for easy theme switching */
+        :root {
+            /* Dark Mode Defaults */
+            --bg-color: #000000;
+            --text-color: #FF0000;
+            --access-color: #00FF00;
+            --blue-text-color: #4141c4;
+            --button-bg: #4141c4;
+            --button-text: #ffffff;
+            --cli-bg: #1a1a1a;
+            --input-border: #FF0000;
+        }
+
+        /* Light Mode Variables */
+        body.light-mode {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --access-color: #008000;
+            --blue-text-color: #0000FF;
+            --button-bg: #FF0000;
+            --button-text: #ffffff;
+            --cli-bg: #f5f5f5;
+            --input-border: #0000FF;
+        }
+
+        /* General styles for the body */
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Courier New', Courier, monospace;
+            padding: 20px;
+            margin: 0;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            transition: background-color 0.5s, color 0.5s; 
+        }
+
+        /* Access Granted Message */
+        .access-message {
+            color: var(--access-color);
+            font-size: 2.5em;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            animation: blink 1s steps(1) infinite;
+        }
+
+        /* Standard text color class (blue) */
+        .blue-text {
+            color: var(--blue-text-color);
+        }
+
+        /* Toggle Button Styles */
+        #mode-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* CLI Container */
+        #cli-container {
+            width: 80%;
+            max-width: 600px;
+            margin-top: 30px;
+            background-color: var(--cli-bg);
+            border: 1px solid var(--input-border);
+            padding: 10px;
+            text-align: left;
+            overflow-y: auto;
+            max-height: 200px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* CLI Input Field */
+        #cli-input {
+            background-color: transparent;
+            border: none;
+            color: var(--text-color);
+            width: calc(100% - 15px);
+            font-family: 'Courier New', Courier, monospace;
+            outline: none;
+        }
+        
+        .prompt {
+            color: var(--access-color);
+        }
+        
+        .error {
+            color: var(--text-color);
+        }
+
+    </style>
+</head>
+<body>
+
+    <button id="mode-toggle" onclick="toggleMode()">Switch to Light Mode</button>
+
+    <div class="access-message">
+        ROOT ACCESS GRANTED
+    </div>
+
+    <p>
+        Welcome user. The system is ready for your <span class="blue-text">Java</span> class operations.
+    </p>
+
+    <div id="cli-container">
+        <div id="cli-output">
+            <p><span class="prompt">C:\JavaSys></span> System initiated. Type 'help' for commands.</p>
+        </div>
+        <div>
+            <span class="prompt">C:\JavaSys></span><input type="text" id="cli-input" onkeydown="handleCommand(event)" autofocus>
+        </div>
+    </div>
+
+    <script>
+        function toggleMode() {
+            const body = document.body;
+            body.classList.toggle('light-mode');
+            
+            const button = document.getElementById('mode-toggle');
+            if (body.classList.contains('light-mode')) {
+                button.textContent = 'Switch to Dark Mode';
+            } else {
+                button.textContent = 'Switch to Light Mode';
+            }
+        }
+
+        function handleCommand(event) {
+            if (event.key === 'Enter') {
+                const inputElement = document.getElementById('cli-input');
+                const command = inputElement.value.trim();
+                inputElement.value = '';
+                processCommand(command);
+            }
+        }
+
+        function processCommand(command) {
+            const outputArea = document.getElementById('cli-output');
+            const newLine = document.createElement('p');
+            newLine.textContent = `C:\\JavaSys> ${command}`;
+            outputArea.appendChild(newLine);
+
+            let response = '';
+            if (command.toLowerCase() === 'help') {
+                response = 'Available commands for Java class: help, clear, status, java -version, compile [filename]';
+            } else if (command.toLowerCase() === 'clear') {
+                outputArea.innerHTML = '';
+                response = 'Console cleared.';
+            } else if (command.toLowerCase() === 'status') {
+                response = 'Status: OPERATIONAL. All systems green.';
+            } else if (command.toLowerCase() === 'java -version') {
+                response = 'Java Runtime Environment (JRE) v17.0.1 installed.';
+            } else if (command.toLowerCase().startsWith('compile')) {
+                 response = `Compiling ${command.split(' ')[1] || 'file.java'}... Compilation successful.`;
+            } else if (command === '') {
+                // Do nothing for empty command
+            } else {
+                response = `ERROR: Command not found: '${command}'. Type 'help' for options.`;
+                newLine.classList.add('error');
+            }
+
+            if (response) {
+                const responseLine = document.createElement('p');
+                responseLine.textContent = response;
+                if (response.startsWith('ERROR')) {
+                    responseLine.classList.add('error');
+                }
+                outputArea.appendChild(responseLine);
+            }
+            
+            outputArea.scrollTop = outputArea.scrollHeight;
+        }
+    </script>
+
+</body>
+</html>
 
