@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Retro Snake Game</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      background-color: #222;
+      color: #eee;
+      font-family: 'Press Start 2P', cursive;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2rem;
+      text-transform: uppercase;
+      color: #4ade80; /* Green color */
+      margin-bottom: 10px;
+    }
+    #score {
+      font-size: 1rem; /* slightly smaller to fit layout */
+      margin-bottom: 12px;
+    }
+    #game-container {
+      position: relative;
+      /* Make canvas responsive */
+      width: 90vw;
+      height: 90vw;
+      max-width: 400px;
+      max-height: 400px;
+    }
+    canvas {
+      background-color: #000;
+      border: 4px solid #444;
+      border-radius: 8px;
+      /* Make canvas fill its container visually, keep internal resolution via attributes */
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      display: block;
+    }
+    #game-over-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      background-color: rgba(0, 0, 0, 0.85);
+      padding: 18px 28px;
+      border-radius: 10px;
+      text-align: center;
+      display: none; /* Hidden by default */
+      pointer-events: auto;
+    }
+    #game-over-message h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      color: #f87171; /* Red color */
+    }
+    #play-again-btn {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.8rem;
+      padding: 10px 18px;
+      border: 2px solid white;
+      background-color: transparent;
+      color: white;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    #play-again-btn:hover {
+      background-color: white;
+      color: black;
+    }
+  </style>
+</head>
+<body>
+  <h1>Snake</h1>
+  <div id="score">Score: 0</div>
+
+  <div id="game-container">
+    <!-- Internal coordinate system: 400x400. CSS scales this visually. -->
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+    <div id="game-over-message">
+      <h2 id="game-over-heading">Game Over!</h2>
+      <button id="play-again-btn">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    // --- Config ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    // Keep pixel rendering crisp when scaled
+    ctx.imageSmoothingEnabled = false;
+
+    const gridSize = 20;           // each square is 20x20 px
+    let gameSpeed = 100;          // ms per tick
+    let gameLoop = null;          // setInterval id
+
+    // --- DOM elements ---
+    const scoreEl = document.getElementById('score');
+    const gameOverOverlay = document.getElementById('game-over-message');
+    const gameOverHeading = document.getElementById('game-over-heading');
+    const playAgainBtn = document.getElementById('play-again-btn');
+
+    // --- Game State ---
+    let snake = [];
+    let food = null;
+    let score = 0;
+    let changingDirection = false;
+    let dx = gridSize;  // start moving right
+    let dy = 0;
+    let isRunning = false;
+
+    // --- Helpers ---
+    function randomPosition(min, max) {
+      return Math.round((Math.random() * (max - min) + min) / gridSize) * gridSize;
+    }
+
+    function createFood() {
+      food = {
+        x: randomPosition(0, canvas.width - gridSize),
+        y: randomPosition(0, canvas.height - gridSize)
+      };
+
+      // If food spawns on the snake, retry
+      if (snake.some(part => part.x === food.x && part.y === food.y)) {
+        createFood();
+      }
+    }
+
+    // --- Drawing ---
+    function drawSnakePart(part) {
+      ctx.fillStyle = '#4ade80';
+      ctx.strokeStyle = '#166534';
+      ctx.fillRect(part.x, part.y, gridSize, gridSize);
+      ctx.strokeRect(part.x, part.y, gridSize, gridSize);
+    }
+
+    function drawSnake() {
+      snake.forEach(drawSnakePart);
+    }
+
+    function drawFood() {
+      if (!food) return;
+      ctx.fillStyle = '#f87171';
+      ctx.strokeStyle = '#b91c1c';
+      ctx.fillRect(food.x, food.y, gridSize, gridSize);
+      ctx.strokeRect(food.x, food.y, gridSize, gridSize);
+    }
+
+    function clearCanvas() {
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function draw() {
+      clearCanvas();
+      drawSnake();
+      drawFood();
+      // Score is shown in DOM (not on canvas) — update it here
+      scoreEl.textContent = 'Score: ' + score;
+    }
+
+    // --- Game Logic ---
+    function didGameEnd() {
+      // Self collision. Start at index 4 (head can't collide with the first few parts on immediate start)
+      for (let i = 4; i < snake.length; i++) {
+        if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) {
+          return true;
+        }
+      }
+
+      // Wall collision
+      const hitLeftWall = snake[0].x < 0;
+      const hitRightWall = snake[0].x > canvas.width - gridSize;
+      const hitTopWall = snake[0].y < 0;
+      const hitBottomWall = snake[0].y > canvas.height - gridSize;
+
+      return hitLeftWall || hitRightWall || hitTopWall || hitBottomWall;
+    }
+
+    function update() {
+      // If game ended, stop and show overlay (safety)
+      if (!isRunning) return;
+
+      if (didGameEnd()) {
+        endGame();
+        return;
+      }
+
+      // Allow new direction change for this tick
+      changingDirection = false;
+
+      // Create new head based on direction
+      const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+      snake.unshift(head);
+
+      // Did we eat the food?
+      if (head.x === food.x && head.y === food.y) {
+        score += 10;
+        createFood();
+        // Don't pop tail -> snake grows
+      } else {
+        // remove tail to keep same length
+        snake.pop();
+      }
+    }
+
+    // --- Input ---
+    function changeDirection(event) {
+      if (!isRunning) return;
+
+      const LEFT_KEY = 37;
+      const UP_KEY = 38;
+      const RIGHT_KEY = 39;
+      const DOWN_KEY = 40;
+
+      if (changingDirection) return;
+      changingDirection = true;
+
+      const keyPressed = event.keyCode;
+
+      const goingUp = dy === -gridSize;
+      const goingDown = dy === gridSize;
+      const goingRight = dx === gridSize;
+      const goingLeft = dx === -gridSize;
+
+      if (keyPressed === LEFT_KEY && !goingRight) { dx = -gridSize; dy = 0; }
+      if (keyPressed === UP_KEY && !goingDown)    { dx = 0; dy = -gridSize; }
+      if (keyPressed === RIGHT_KEY && !goingLeft) { dx = gridSize; dy = 0; }
+      if (keyPressed === DOWN_KEY && !goingUp)    { dx = 0; dy = gridSize; }
+    }
+
+    // Prevent arrow keys from scrolling page and route input to changeDirection
+    document.addEventListener('keydown', function(e) {
+      const ARROWS = [37, 38, 39, 40];
+      if (ARROWS.includes(e.keyCode)) {
+        e.preventDefault();
+        changeDirection(e);
+      }
+    });
+
+    // --- Game Control ---
+    function startGameLoop() {
+      // Clear any existing loop
+      if (gameLoop) {
+        clearInterval(gameLoop);
+      }
+      gameLoop = setInterval(() => {
+        update();
+        draw();
+      }, gameSpeed);
+    }
+
+    function endGame() {
+      isRunning = false;
+      // Stop loop
+      if (gameLoop) {
+        clearInterval(gameLoop);
+        gameLoop = null;
+      }
+
+      // Show overlay with final score
+      gameOverHeading.textContent = `Game Over! Score: ${score}`;
+      gameOverOverlay.style.display = 'block';
+      playAgainBtn.focus();
+    }
+
+    function initializeGame() {
+      // Hide overlay
+      gameOverOverlay.style.display = 'none';
+
+      // Reset direction and speed if desired
+      dx = gridSize;
+      dy = 0;
+
+      // Initial snake: 3 segments, horizontal
+      snake = [
+        { x: 160, y: 200 }, // head
+        { x: 140, y: 200 },
+        { x: 120, y: 200 }
+      ];
+
+      score = 0;
+      changingDirection = false;
+      isRunning = true;
+
+      createFood();
+      draw(); // draw initial state immediately
+      startGameLoop();
+    }
+
+    // --- Hooks ---
+    playAgainBtn.addEventListener('click', initializeGame);
+
+    // Start on load
+    initializeGame();
+
+    // Optional: Expose to window for debugging
+    // window._snakeGame = { initializeGame, endGame, getState: () => ({ snake, food, score }) };
+  </script>
+</body>
+</html>
